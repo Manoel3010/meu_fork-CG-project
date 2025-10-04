@@ -189,6 +189,8 @@ int init() {
     return 1;
 }
 
+GLfloat globalLigthPos[4] = {10.0f, 10.0f, 10.0f, 1.0f};
+
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -210,30 +212,68 @@ void display() {
     drawSkybox(50.0f);
     glPopMatrix();
 
+    setupGlobalLigth();
 
-    // Definindo as propriedades da fonte de luz
-    GLfloat ambientLight[]  = {0.2f, 0.2f, 0.2f, 1.0f};  // Luz ambiente fraca
-    GLfloat diffuseLight[]  = {0.8f, 0.8f, 0.8f, 1.0f};  // Luz difusa branca
-    GLfloat specularLight[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Brilho especular branco
-    GLfloat lightPosition[] = {10.0f, 10.0f, 10.0f, 1.0f}; // Posi��o da luz
-
-    // Define as propriedades do material (pode ser gen�rico para todos os objetos)
-    GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
-    GLfloat diffuseMaterial[]  = {0.8f, 0.8f, 0.8f, 1.0f};
-    GLfloat specularMaterial[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    GLfloat shininess = 20;
-
-    // chama a fun��o para aplicar ilumina��o
-    setupLighting(ambientLight, diffuseLight, specularLight, lightPosition, ambientMaterial, diffuseMaterial, specularMaterial, shininess);
+/*  //USANDO FUNÇÃO SHADOW
+    GLfloat playerPlane [4] = {0.0f, 1.0f, 0.0f, 0.0f}; // Plano Y=0
+    drawPlayerModel(&player, playerRotation);
+    drawShadow(playerPlane, globalLigthPos, drawPlayerModel);
 
     glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
 
     // chama fun��o para desenhar o modelo 3D na tela a cada frane
+    for (int i = 0; i < objectCount; ++i) {
+        drawObject(&sceneObjects[i]);
+        drawCollisionBoxWireframe(sceneObjects[i].collision);
+
+        GLfloat objectPlane[4] = {0.0f, 1.0f, 0.0f, -sceneObjects[i].y};
+        //drawShadow(objectPlane, globalLigthPos, drawObject);
+    }*/
+
+    //Sombras aplicadas direto no main
+    // Sombra do jogador
+    GLfloat playerPlane[4] = {0.0f, 1.0f, 0.0f, -(player.y-1)};
+    GLfloat playerShadowMat[4][4];
+    makeShadowMatrix(playerPlane, globalLigthPos, playerShadowMat);
+    glPushMatrix();
+    glMultMatrixf(playerShadowMat);
+    glDisable(GL_TEXTURE_2D); // Desliga a textura para a sombra
+    glDisable(GL_LIGHTING);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
     drawPlayerModel(&player, playerRotation);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_TEXTURE_2D); // Religa a textura após desenhar a sombra
+    glPopMatrix();
+    
+    
+    glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
+
+    // Sombra dos objetos da cena
+    for (int i = 0; i < objectCount; ++i) {
+        GLfloat objectPlane[4] = {0.0f, 1.0f, 0.0f, -sceneObjects[i].y};
+        GLfloat objectShadowMat[4][4];
+        makeShadowMatrix(objectPlane, globalLigthPos, objectShadowMat);
+        glPushMatrix();
+        glMultMatrixf(objectShadowMat);
+
+        glDisable(GL_TEXTURE_2D); // Desliga a textura para a sombra
+        glDisable(GL_LIGHTING);
+        glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
+        drawObject(&sceneObjects[i]);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_TEXTURE_2D); // Religa a textura após desenhar a sombra
+        glPopMatrix();
+    }
+ 
+    // Desenha jogador e objetos reais com cor/textura/iluminação
+    drawPlayerModel(&player, playerRotation);
+
+
     for (int i = 0; i < objectCount; ++i) {
         drawObject(&sceneObjects[i]);
         drawCollisionBoxWireframe(sceneObjects[i].collision);
     }
+
     drawCollisionBoxWireframe(player.collision);
 
     glutPostRedisplay();

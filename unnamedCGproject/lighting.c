@@ -20,3 +20,19 @@ void setupLighting(GLfloat *ambientLight, GLfloat *diffuseLight, GLfloat *specul
     glMaterialf(GL_FRONT, GL_SHININESS, shininess); // intensidade da luz
 }
 
+void setupGlobalLigth(){
+    // Definindo as propriedades da fonte de luz
+    GLfloat ambientLight[]  = {0.2f, 0.2f, 0.2f, 1.0f};  // Luz ambiente fraca
+    GLfloat diffuseLight[]  = {0.8f, 0.8f, 0.8f, 1.0f};  // Luz difusa branca
+    GLfloat specularLight[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Brilho especular branco
+    GLfloat lightPosition[] = {10.0f, 10.0f, 10.0f, 1.0f}; // Posiçao da luz
+
+    // Define as propriedades do material (pode ser generico para todos os objetos)
+    GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
+    GLfloat diffuseMaterial[]  = {0.8f, 0.8f, 0.8f, 1.0f};
+    GLfloat specularMaterial[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    GLfloat shininess = 20;
+
+    // chama a fun��o para aplicar ilumina��o
+    setupLighting(ambientLight, diffuseLight, specularLight, lightPosition, ambientMaterial, diffuseMaterial, specularMaterial, shininess);
+}
