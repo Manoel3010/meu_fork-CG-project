@@ -214,6 +214,10 @@ int init() {
     return 1;
 }
 
+void drawPlayerShadowFunc(void) {
+    drawPlayerModel(&player, playerRotation);
+}
+
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -240,7 +244,7 @@ void display() {
     GLfloat ambientLight[]  = {0.2f, 0.2f, 0.2f, 1.0f};  // Luz ambiente fraca
     GLfloat diffuseLight[]  = {0.8f, 0.8f, 0.8f, 1.0f};  // Luz difusa branca
     GLfloat specularLight[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Brilho especular branco
-    GLfloat lightPosition[] = {10.0f, 10.0f, 10.0f, 1.0f}; // Posi��o da luz
+    GLfloat lightPosition[] = {200.0f, 500.0f, 200.0f, 1.0f}; // Posi��o da luz
 
     // Define as propriedades do material (pode ser gen�rico para todos os objetos)
     GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
@@ -255,6 +259,7 @@ void display() {
 
     // chama fun��o para desenhar o modelo 3D na tela a cada frane
     drawPlayerModel(&player, playerRotation);
+
     for (int i = 0; i < objectCount; ++i) {
         if (sceneObjects[i].type == PLATFORM) {
             drawPlatform(&sceneObjects[i]);
@@ -265,6 +270,8 @@ void display() {
         //drawCollisionBoxWireframe(sceneObjects[i].collision);
     }
     //drawCollisionBoxWireframe(player.collision);
+
+    drawShadow(&player, objectsInCollisionRange, playerRotation);
 
     glutPostRedisplay();
     glutSwapBuffers();
