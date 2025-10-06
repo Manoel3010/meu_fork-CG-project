@@ -44,7 +44,7 @@ Player player = {
     NULL                   // modelData
 };
 
-PlayerMoveKeys moveKeys = {false, false, false, false, false, false};
+PlayerMoveKeys moveKeys = {false, false, false, false, false};
 
 float checkpointX, checkpointY, checkpointZ;
 float playerVelocity[] = {0.0f, 0.0f, 0.0f};
@@ -54,50 +54,14 @@ SceneObject sceneObjects[MAX_OBJECTS];
 int objectCount = 0;
 
 // índice de início das plataformas no array sceneObjects
-int platformStartIndex = 0;
+int platformStartIndex = 0; //  por enquanto não vai usar isso, talvez depois
 SceneObject objectsInCollisionRange[MAX_OBJECTS];
 int objInColRangeCount = 0;
 
-// Array que guarda as plataformas
-PlatformData levelPlatforms[] = {
-    // 1. O Chão (Plataforma Inicial)
-    // A superfície superior (onde o jogador pisa) está em Y = 1.0.
-    { .centerX = 0.0f, .centerY = -1.0f, .centerZ = 0.0f, .width = 30.0f, .height = 4.0f, .depth = 30.0f },
-
-    // 2. A Parede Traseira (no lado Z negativo)
-    { .centerX = 0.0f, .centerY = 11.0f, .centerZ = -16.0f, .width = 32.0f, .height = 20.0f, .depth = 2.0f },
-
-    // 3. A Parede Esquerda (no lado X negativo)
-    { .centerX = -16.0f, .centerY = 11.0f, .centerZ = 0.0f, .width = 2.0f, .height = 20.0f, .depth = 30.0f },
-
-    // 4. A Parede Direita (no lado X positivo)
-    // Igual à parede esquerda, mas no lado oposto.
-    { .centerX = 16.0f, .centerY = 11.0f, .centerZ = 0.0f, .width = 2.0f, .height = 20.0f, .depth = 30.0f },
-
-    // 5. O Teto
-    { .centerX = 0.0f, .centerY = 22.0f, .centerZ = 0.0f, .width = 32.0f, .height = 2.0f, .depth = 32.0f },
-
-    // 6. Nova Plataforma Pequena no meio do vão
-    { .centerX = 0.0f, .centerY = -1.0f, .centerZ = 30.0f, .width = 8.0f, .height = 4.0f, .depth = 8.0f },
-
-    // 7. plataforma (mais à frente e à direita)
-    { .centerX = 0.0f, .centerY = -1.0f, .centerZ = 55.0f, .width = 15.0f, .height = 4.0f, .depth = 15.0f },
-
-    // 8. plataforma (mais à frente e à direita)
-    { .centerX = 0.0f, .centerY = -1.0f, .centerZ = 85.0f, .width = 15.0f, .height = 4.0f, .depth = 15.0f },
-
-    // 9. plataforma (diagonal da plataforma 8)
-    { .centerX = 10.0f, .centerY = 10.0f, .centerZ = 115.0f, .width = 15.0f, .height = 4.0f, .depth = 15.0f },
-
-    // 10. plataforma (diagonal da plataforma 8)
-    { .centerX = -10.0f, .centerY = 30.0f, .centerZ = 115.0f, .width = 15.0f, .height = 4.0f, .depth = 15.0f },
-};
-int numPlatforms = sizeof(levelPlatforms) / sizeof(PlatformData);
-
-GLuint texFront, texBack, texLeft, texRight, texTop, texBase;
+//GLuint texFront, texBack, texLeft, texRight, texTop, texBase;
 
 int init() {
-    glClearColor(0.6f, 0.6f, 0.6f, 1.0f);
+    glClearColor(0.32f, 0.23f, 0.5f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -108,14 +72,6 @@ int init() {
 
     glEnable(GL_TEXTURE_2D);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);//forçar a textura a substituir a cor/material
-
-    // Carrega cada textura da plataforma
-    texFront = loadTexture("tex_cenario/girder_wood.png");
-    texBack = loadTexture("tex_cenario/wall_ruined_1.png");
-    texLeft = loadTexture("tex_cenario/wall_ruined_2.png");
-    texRight = loadTexture("tex_cenario/wall_ruined_3.png");
-    texTop = loadTexture("tex_cenario/wood_3.png");
-    texBase = loadTexture("tex_cenario/metal_floor_1.png");
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -169,7 +125,6 @@ int init() {
     // agora adiciona plataformas
     //loadLevelPlatforms();
 
-    // Pra animar alguma plataforma, faz o msm que fiz abaixo (verifique o índice em PlatformData levelPlatforms[])
     // Índice da plataforma 9 é (0-indexed, então é 8)
     int ninePlatformIndex = platformStartIndex + 8;
     // Garante que não vamos acessar um índice fora do array
@@ -185,11 +140,79 @@ int init() {
         sceneObjects[ninePlatformIndex].anim.minLimit = -20.0f;
     }
 
+    for (int i = 0; i < objectCount; i++) {
+        SceneObject* currentObject = &sceneObjects[i];
+
+        // Animação para a Plataforma 9 (que se move para os lados)
+        // Posição inicial dela: X=10, Y=10, Z=115
+        if (currentObject->x == 10.0f && currentObject->y == 10.0f && currentObject->z == 115.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 0; // 0 para Eixo X
+            currentObject->anim.moveSpeed = 8.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = -10.0f; // Moverá de -10 a 10 no eixo X
+            currentObject->anim.maxLimit = 10.0f;
+        }
+
+        // Animação para a Plataforma 11 (que sobe e desce)
+        // Posição inicial dela: X=-10, Y=50, Z=140
+        if (currentObject->x == -10.0f && currentObject->y == 50.0f && currentObject->z == 140.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 2; // 2 para Eixo Y
+            currentObject->anim.moveSpeed = 4.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = 40.0f; // Ponto mais baixo
+            currentObject->anim.maxLimit = 60.0f; // Ponto mais alto
+        }
+
+        // Animação para a Plataforma 12 (que se move para os lados)
+        // Posição inicial dela: X=-10, Y=50, Z=165
+        if (currentObject->x == -10.0f && currentObject->y == 50.0f && currentObject->z == 165.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 0; // 0 para Eixo X
+            currentObject->anim.moveSpeed = 5.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = -20.0f; // Moverá de -10 a 10 no eixo X
+            currentObject->anim.maxLimit = 20.0f;
+        }
+
+        // Animação para a Plataforma 13 (que se move para os lados)
+        // Posição inicial dela: X=-10, Y=50, Z=190
+        if (currentObject->x == -10.0f && currentObject->y == 50.0f && currentObject->z == 190.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 0; // 0 para Eixo X
+            currentObject->anim.moveSpeed = 8.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = -10.0f; // Moverá de -10 a 10 no eixo X
+            currentObject->anim.maxLimit = 10.0f;
+        }
+
+        // Animação para a Plataforma 14 (que se move para os lados)
+        // Posição inicial dela: X=-10, Y=50, Z=215
+        if (currentObject->x == -10.0f && currentObject->y == 50.0f && currentObject->z == 215.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 0; // 0 para Eixo X
+            currentObject->anim.moveSpeed = 6.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = -15.0f; // Moverá de -10 a 10 no eixo X
+            currentObject->anim.maxLimit = 15.0f;
+        }
+
+        // Animação para a Plataforma 15 (que se move para os lados)
+        // Posição inicial dela: X=-10, Y=50, Z=240
+        if (currentObject->x == -10.0f && currentObject->y == 50.0f && currentObject->z == 240.0f) {
+            currentObject->anim.isAnimated = true;
+            currentObject->anim.animationAxis = 0; // 0 para Eixo X
+            currentObject->anim.moveSpeed = 7.0f;
+            currentObject->anim.moveDirection = 1.0f;
+            currentObject->anim.minLimit = -10.0f; // Moverá de -10 a 10 no eixo X
+            currentObject->anim.maxLimit = 10.0f;
+        }
+    }
+
 
     return 1;
 }
-
-GLfloat globalLigthPos[4] = {10.0f, 10.0f, 10.0f, 1.0f};
 
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -212,69 +235,36 @@ void display() {
     drawSkybox(50.0f);
     glPopMatrix();
 
-    setupGlobalLigth();
 
-/*  //USANDO FUNÇÃO SHADOW
-    GLfloat playerPlane [4] = {0.0f, 1.0f, 0.0f, 0.0f}; // Plano Y=0
-    drawPlayerModel(&player, playerRotation);
-    drawShadow(playerPlane, globalLigthPos, drawPlayerModel);
+    // Definindo as propriedades da fonte de luz
+    GLfloat ambientLight[]  = {0.2f, 0.2f, 0.2f, 1.0f};  // Luz ambiente fraca
+    GLfloat diffuseLight[]  = {0.8f, 0.8f, 0.8f, 1.0f};  // Luz difusa branca
+    GLfloat specularLight[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Brilho especular branco
+    GLfloat lightPosition[] = {10.0f, 10.0f, 10.0f, 1.0f}; // Posi��o da luz
+
+    // Define as propriedades do material (pode ser gen�rico para todos os objetos)
+    GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
+    GLfloat diffuseMaterial[]  = {0.8f, 0.8f, 0.8f, 1.0f};
+    GLfloat specularMaterial[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    GLfloat shininess = 20;
+
+    // chama a fun��o para aplicar ilumina��o
+    setupLighting(ambientLight, diffuseLight, specularLight, lightPosition, ambientMaterial, diffuseMaterial, specularMaterial, shininess);
 
     glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
 
     // chama fun��o para desenhar o modelo 3D na tela a cada frane
-    for (int i = 0; i < objectCount; ++i) {
-        drawObject(&sceneObjects[i]);
-        drawCollisionBoxWireframe(sceneObjects[i].collision);
-
-        GLfloat objectPlane[4] = {0.0f, 1.0f, 0.0f, -sceneObjects[i].y};
-        //drawShadow(objectPlane, globalLigthPos, drawObject);
-    }*/
-
-    //Sombras aplicadas direto no main
-    // Sombra do jogador
-    GLfloat playerPlane[4] = {0.0f, 1.0f, 0.0f, -(player.y-1)};
-    GLfloat playerShadowMat[4][4];
-    makeShadowMatrix(playerPlane, globalLigthPos, playerShadowMat);
-    glPushMatrix();
-    glMultMatrixf(playerShadowMat);
-    glDisable(GL_TEXTURE_2D); // Desliga a textura para a sombra
-    glDisable(GL_LIGHTING);
-    glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
     drawPlayerModel(&player, playerRotation);
-    glEnable(GL_LIGHTING);
-    glEnable(GL_TEXTURE_2D); // Religa a textura após desenhar a sombra
-    glPopMatrix();
-    
-    
-    glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
-
-    // Sombra dos objetos da cena
     for (int i = 0; i < objectCount; ++i) {
-        GLfloat objectPlane[4] = {0.0f, 1.0f, 0.0f, -sceneObjects[i].y};
-        GLfloat objectShadowMat[4][4];
-        makeShadowMatrix(objectPlane, globalLigthPos, objectShadowMat);
-        glPushMatrix();
-        glMultMatrixf(objectShadowMat);
-
-        glDisable(GL_TEXTURE_2D); // Desliga a textura para a sombra
-        glDisable(GL_LIGHTING);
-        glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
-        drawObject(&sceneObjects[i]);
-        glEnable(GL_LIGHTING);
-        glEnable(GL_TEXTURE_2D); // Religa a textura após desenhar a sombra
-        glPopMatrix();
+        if (sceneObjects[i].type == PLATFORM) {
+            drawPlatform(&sceneObjects[i]);
+        }
+        else {
+            drawObject(&sceneObjects[i]);
+        }
+        //drawCollisionBoxWireframe(sceneObjects[i].collision);
     }
- 
-    // Desenha jogador e objetos reais com cor/textura/iluminação
-    drawPlayerModel(&player, playerRotation);
-
-
-    for (int i = 0; i < objectCount; ++i) {
-        drawObject(&sceneObjects[i]);
-        drawCollisionBoxWireframe(sceneObjects[i].collision);
-    }
-
-    drawCollisionBoxWireframe(player.collision);
+    //drawCollisionBoxWireframe(player.collision);
 
     glutPostRedisplay();
     glutSwapBuffers();
@@ -335,11 +325,35 @@ void simulatePhysics(float deltaTime) {
             respawnPlayer();
             return; // Sai da física neste frame
         }
+
+        else if (objectsInCollisionRange[i].type == FLAG) {
+                checkpointX = objectsInCollisionRange[i].x + 2.0f;
+                checkpointY = objectsInCollisionRange[i].y + 1.0f;
+                checkpointZ = objectsInCollisionRange[i].z + 2.0f;
+                printf("Checkpoint atualizado em (%.1f, %.1f, %.1f)\n", checkpointX, checkpointY, checkpointZ);
+                // Opcional: Desativa a bandeira para não ser pega novamente
+                objectsInCollisionRange[i].type = DEFAULT;
+            }
     }
 
     // 7. Processa movimento e colisões com plataformas/paredes
     collideAndSlide(playerVelocity, &player, objectsInCollisionRange, objInColRangeCount, deltaTime);
     getPlayerMovingAngle(playerVelocity, &playerRotation);
+
+    // 7.1 acessa o objeto original que o player tá em cima
+    if (player.isOnGround && player.groundObjectIndex >= 0 && player.groundObjectIndex < objInColRangeCount) {
+        SceneObject* groundObj = &objectsInCollisionRange[player.groundObjectIndex];
+
+        if (groundObj->anim.isAnimated) {
+            // Delta real de movimento da plataforma
+            float platform_dx = groundObj->x - groundObj->prevX;
+            float platform_dy = groundObj->y - groundObj->prevY;
+            float platform_dz = groundObj->z - groundObj->prevZ;
+
+            float movement[3] = {platform_dx, platform_dy, platform_dz};
+            movePlayer(movement, &player);
+        }
+    }
 
     // 8. Verifica morte por queda
     if (player.y < DEATH_Y_LEVEL) {
@@ -416,23 +430,6 @@ void handleWindowResize(int newWidth, int newHeight) {
 
     // d� redisplay na tela por seguran�a
     glutPostRedisplay();
-}
-
-// atualizado para o fileManager
-// Função para carregar as plataformas
-void loadLevelPlatforms() {
-    platformStartIndex = objectCount; // guarda o índice inicial das plataformas
-    for (int i = 0; i < numPlatforms; i++) {
-        CollisionBox platCol;
-        PlatformData currentPlatform = levelPlatforms[i];
-        platCol.minX = currentPlatform.centerX - currentPlatform.width / 2;
-        platCol.maxX = currentPlatform.centerX + currentPlatform.width / 2;
-        platCol.minY = currentPlatform.centerY - currentPlatform.height / 2;
-        platCol.maxY = currentPlatform.centerY + currentPlatform.height / 2;
-        platCol.minZ = currentPlatform.centerZ - currentPlatform.depth / 2;
-        platCol.maxZ = currentPlatform.centerZ + currentPlatform.depth / 2;
-        loadPlatform(sceneObjects, &objectCount, currentPlatform.centerX, currentPlatform.centerY, currentPlatform.centerZ, &platCol);
-    }
 }
 
 // Função para respawnar o player caso ele morra

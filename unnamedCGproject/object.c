@@ -22,6 +22,7 @@ void loadObject(SceneObject* object, const char* filename, float x, float y, flo
     object->x = x;
     object->y = y;
     object->z = z;
+    object->scale = 1.0f;
 
     // Define o tipo padr�o para objetos carregados
     object->type = DEFAULT;
@@ -52,6 +53,7 @@ void drawObject(SceneObject* object) {
     glBindTexture(GL_TEXTURE_2D, object->textureID);
     glPushMatrix();
         glTranslatef(object->x, object->y, object->z);
+        glScalef(object->scale, object->scale, object->scale);
         if (object->rotationAngle != 0.0f) {
             glRotatef(object->rotationAngle, object->rotX, object->rotY, object->rotZ);
         }
@@ -103,6 +105,7 @@ void drawObject(SceneObject* object) {
                 }
             }
         }
+
     glPopMatrix();
 }
 
@@ -118,6 +121,8 @@ void getCollisionBoxFromObject(SceneObject *object) {
     cgltf_data *data = object->data;
     if (data != NULL) {
         float minX = 0.0f, minY = 0.0f, minZ = 0.0f, maxX = 0.0f, maxY = 0.0f, maxZ = 0.0f;
+        bool boundsFound = false; // Flag para inicializar os limites na primeira vez
+
         for (size_t meshIndex = 0; meshIndex < data->meshes_count; ++meshIndex) {
             cgltf_mesh* mesh = &data->meshes[meshIndex];
             for (size_t primIndex = 0; primIndex < mesh->primitives_count; ++primIndex) {
@@ -126,33 +131,49 @@ void getCollisionBoxFromObject(SceneObject *object) {
                     cgltf_attribute* attr = &primitive->attributes[attrIndex];
                     if (attr->type == cgltf_attribute_type_position) {
                         cgltf_accessor* accessor = attr->data;
-                        minX = accessor->min[0];
-                        minY = accessor->min[1];
-                        minZ = accessor->min[2];
-                        maxX = accessor->max[0];
-                        maxY = accessor->max[1];
-                        maxZ = accessor->max[2];
+                        if (!boundsFound) { // Se for a primeira vez, apenas define os valores
+                            minX = accessor->min[0]; minY = accessor->min[1]; minZ = accessor->min[2];
+                            maxX = accessor->max[0]; maxY = accessor->max[1]; maxZ = accessor->max[2];
+                            boundsFound = true;
+                        } else { // Para as outras partes, compara e acumula
+                            minX = fminf(minX, accessor->min[0]);
+                            minY = fminf(minY, accessor->min[1]);
+                            minZ = fminf(minZ, accessor->min[2]);
+                            maxX = fmaxf(maxX, accessor->max[0]);
+                            maxY = fmaxf(maxY, accessor->max[1]);
+                            maxZ = fmaxf(maxZ, accessor->max[2]);
+                        }
                     }
                 }
             }
         }
-        object->collision.minX = minX + object->x;
-        object->collision.maxX = maxX + object->x;
-        object->collision.minY = minY + object->y;
-        object->collision.maxY = maxY + object->y;
-        object->collision.minZ = minZ + object->z;
-        object->collision.maxZ = maxZ + object->z;
 
-        // Se o objeto for perigoso (um espinho), ajusta sua caixa de colis�o
-        // para corresponder � sua forma vertical, ignorando a altura do modelo original.
+        object->collision.minX = (minX * object->scale) + object->x;
+        object->collision.maxX = (maxX * object->scale) + object->x;
+        object->collision.minY = (minY * object->scale) + object->y;
+        object->collision.maxY = (maxY * object->scale) + object->y;
+        object->collision.minZ = (minZ * object->scale) + object->z;
+        object->collision.maxZ = (maxZ * object->scale) + object->z;
+
         if (object->type == DANGER) {
-            // Define a base da colis�o na posi��o Y do objeto
             object->collision.minY = object->y;
-            // Define o topo da colis�o. Ajuste o '3.0f' se quiser que a caixa seja mais alta ou mais baixa.
             object->collision.maxY = object->y + 3.0f;
         }
+
+        // Cria uma caixa de colisão personalizada para a bandeira, ignorando a do ficheiro.
+        if (object->type == FLAG) {
+            float halfWidth = 0.2f; // Largura total de 2
+            float height = 5.0f;    // Altura total de 5
+            float halfDepth = 0.2f; // Profundidade total de 2
+
+            object->collision.minX = object->x - halfWidth;
+            object->collision.maxX = object->x + halfWidth;
+            object->collision.minY = object->y; // A base da caixa fica na posição Y da bandeira
+            object->collision.maxY = object->y + height;
+            object->collision.minZ = object->z - halfDepth;
+            object->collision.maxZ = object->z + halfDepth;
+        }
     }
-    // printf("OBJ: %f, %f, %f - %f, %f, %f\n", object->collision.minX, object->collision.minY, object->collision.minZ, object->collision.maxX, object->collision.maxY, object->collision.maxZ);
 }
 
 // platform related thingys
@@ -180,71 +201,76 @@ GLuint texFront, texBack, texLeft, texRight, texTop, texBase;
 
 void drawPlatform(SceneObject *platform){
     glPushMatrix();//Salva a atual matriz
-    glTranslatef(platform->x, platform->y, platform->z); // Move a plataforma para a posição dela na cena
+        glTranslatef(platform->x, platform->y, platform->z); // Move a plataforma para a posição dela na cena
 
-    float minX = platform->collision.minX - platform->x;
-    float maxX = platform->collision.maxX - platform->x;
-    float minY = platform->collision.minY - platform->y;
-    float maxY = platform->collision.maxY - platform->y;
-    float minZ = platform->collision.minZ - platform->z;
-    float maxZ = platform->collision.maxZ - platform->z;
+        float minX = platform->collision.minX - platform->x;
+        float maxX = platform->collision.maxX - platform->x;
+        float minY = platform->collision.minY - platform->y;
+        float maxY = platform->collision.maxY - platform->y;
+        float minZ = platform->collision.minZ - platform->z;
+        float maxZ = platform->collision.maxZ - platform->z;
 
-    glBindTexture(GL_TEXTURE_2D, texFront); // Ativa a textura da frente
-    glBegin(GL_QUADS); // Início do desenho de um quadrado
-        glTexCoord2f(0,0); glVertex3f(minX, minY, maxZ); // canto inferior esquerdo
-        glTexCoord2f(2,0); glVertex3f(maxX, minY, maxZ); // canto inferior direito
-        glTexCoord2f(2,2); glVertex3f(maxX, maxY, maxZ); // canto superior direito
-        glTexCoord2f(0,2); glVertex3f(minX, maxY, maxZ); // canto superior esquerdo
-    glEnd();
+        // face da frente
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texFront);
+        glBegin(GL_QUADS); // Início do desenho de um quadrado
+            glNormal3f(0.0f, 0.0f, 1.0f);
+            glTexCoord2f(0,0); glVertex3f(minX, minY, maxZ); // canto inferior esquerdo
+            glTexCoord2f(2,0); glVertex3f(maxX, minY, maxZ); // canto inferior direito
+            glTexCoord2f(2,2); glVertex3f(maxX, maxY, maxZ); // canto superior direito
+            glTexCoord2f(0,2); glVertex3f(minX, maxY, maxZ); // canto superior esquerdo
+        glEnd();
 
-    // Face de trás
-    glBindTexture(GL_TEXTURE_2D, texBack);
-    glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex3f(maxX, minY, minZ);
-        glTexCoord2f(2,0); glVertex3f(minX, minY, minZ);
-        glTexCoord2f(2,2); glVertex3f(minX, maxY, minZ);
-        glTexCoord2f(0,2); glVertex3f(maxX, maxY, minZ);
-    glEnd();
+        // face de trás
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texBack);
+        glBegin(GL_QUADS);
+            glNormal3f(0.0f, 0.0f, -1.0f);
+            glTexCoord2f(0,0); glVertex3f(maxX, minY, minZ);
+            glTexCoord2f(2,0); glVertex3f(minX, minY, minZ);
+            glTexCoord2f(2,2); glVertex3f(minX, maxY, minZ);
+            glTexCoord2f(0,2); glVertex3f(maxX, maxY, minZ);
+        glEnd();
 
-    // Face da direita
-    glBindTexture(GL_TEXTURE_2D, texRight);
-    glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex3f(maxX, minY, maxZ);
-        glTexCoord2f(2,0); glVertex3f(maxX, minY, minZ);
-        glTexCoord2f(2,2); glVertex3f(maxX, maxY, minZ);
-        glTexCoord2f(0,2); glVertex3f(maxX, maxY, maxZ);
-    glEnd();
+        // face da direita
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texRight);
+        glBegin(GL_QUADS);
+            glNormal3f(1.0f, 0.0f, 0.0f);
+            glTexCoord2f(0,0); glVertex3f(maxX, minY, maxZ);
+            glTexCoord2f(2,0); glVertex3f(maxX, minY, minZ);
+            glTexCoord2f(2,2); glVertex3f(maxX, maxY, minZ);
+            glTexCoord2f(0,2); glVertex3f(maxX, maxY, maxZ);
+        glEnd();
 
-    // Face da esquerda
-    glBindTexture(GL_TEXTURE_2D, texLeft);
-    glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex3f(minX, minY, minZ);
-        glTexCoord2f(2,0); glVertex3f(minX, minY, maxZ);
-        glTexCoord2f(2,2); glVertex3f(minX, maxY, maxZ);
-        glTexCoord2f(0,2); glVertex3f(minX, maxY, minZ);
-    glEnd();
+        // face da esquerda
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texLeft);
+        glBegin(GL_QUADS);
+            glNormal3f(-1.0f, 0.0f, 0.0f);
+            glTexCoord2f(0,0); glVertex3f(minX, minY, minZ);
+            glTexCoord2f(2,0); glVertex3f(minX, minY, maxZ);
+            glTexCoord2f(2,2); glVertex3f(minX, maxY, maxZ);
+            glTexCoord2f(0,2); glVertex3f(minX, maxY, minZ);
+        glEnd();
 
-    glBindTexture(GL_TEXTURE_2D, texTop); // substituir por texTop
-    glBegin(GL_QUADS);
-        glNormal3f(0.0f, 1.0f, 0.0f);
-        glTexCoord2f(0,0); glVertex3f(minX, maxY, minZ);
-        glTexCoord2f(2,0); glVertex3f(minX, maxY, maxZ);
-        glTexCoord2f(2,2); glVertex3f(maxX, maxY, maxZ);
-        glTexCoord2f(0,2); glVertex3f(maxX, maxY, minZ);
-    glEnd();
+        // topo
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texTop);
+        glBegin(GL_QUADS);
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glTexCoord2f(0,0); glVertex3f(minX, maxY, minZ);
+            glTexCoord2f(2,0); glVertex3f(minX, maxY, maxZ);
+            glTexCoord2f(2,2); glVertex3f(maxX, maxY, maxZ);
+            glTexCoord2f(0,2); glVertex3f(maxX, maxY, minZ);
+        glEnd();
 
 
-    // Base da plataforma
-    // (aqui reaproveitei texBack, mas pode ser outra textura só para a base)
-    glBindTexture(GL_TEXTURE_2D, texBase);
-    glBegin(GL_QUADS);
-        glTexCoord2f(0,0); glVertex3f(minX, minY, minZ);
-        glTexCoord2f(2,0); glVertex3f(maxX, minY, minZ);
-        glTexCoord2f(1,2); glVertex3f(maxX, minY, maxZ);
-        glTexCoord2f(0,2); glVertex3f(minX, minY, maxZ);
-    glEnd();
-
-    glPopMatrix();//Restaura a matriz salva
+        // base
+        glBindTexture(GL_TEXTURE_2D, platform->platformTextures.texBase);
+        glBegin(GL_QUADS);
+            glNormal3f(0.0f, -1.0f, 0.0f);
+            glTexCoord2f(0,0); glVertex3f(minX, minY, minZ);
+            glTexCoord2f(2,0); glVertex3f(maxX, minY, minZ);
+            glTexCoord2f(1,2); glVertex3f(maxX, minY, maxZ);
+            glTexCoord2f(0,2); glVertex3f(minX, minY, maxZ);
+        glEnd();
+    glPopMatrix();
 }
 
 CollisionBox getPlatformCollisionBox(float centerX, float centerY, float centerZ, float width, float height, float depth) {
@@ -258,4 +284,58 @@ CollisionBox getPlatformCollisionBox(float centerX, float centerY, float centerZ
     platformCollision.maxZ = centerZ + depth / 2;
 
     return platformCollision;
+}
+
+void loadPlatformTextures(SceneObject *platform, int textureType) {
+    GLuint back, front, right, left, top, bottom;
+
+    switch (textureType) {
+    case 1: // normal floor
+        back = loadTexture("tex_cenario/wall_ruined_1.png");
+        front = loadTexture("tex_cenario/wall_ruined_1.png");
+        right = loadTexture("tex_cenario/wall_ruined_1.png");
+        left = loadTexture("tex_cenario/wall_ruined_1.png");
+        top = loadTexture("tex_cenario/snow_1.png");
+        bottom = loadTexture("tex_cenario/wall_ruined_7.png");
+        break;
+    case 2: // rock
+        back = loadTexture("tex_cenario/rock_2.png");
+        front = loadTexture("tex_cenario/rock_2.png");
+        right = loadTexture("tex_cenario/rock_2.png");
+        left = loadTexture("tex_cenario/rock_2.png");
+        top = loadTexture("tex_cenario/rock_1.png");
+        bottom = loadTexture("tex_cenario/rock_3.png");
+        break;
+    case 3: // metal
+        back = loadTexture("tex_cenario/girder_16.png");
+        front = loadTexture("tex_cenario/girder_16.png");
+        right = loadTexture("tex_cenario/girder_16.png");
+        left = loadTexture("tex_cenario/girder_16.png");
+        top = loadTexture("tex_cenario/metal_floor_1.png");
+        bottom = loadTexture("tex_cenario/metal_floor_1.png");
+        break;
+    case 4: // wood
+        back = loadTexture("tex_cenario/wood_2.png");
+        front = loadTexture("tex_cenario/wood_1.png");
+        right = loadTexture("tex_cenario/wood_1.png");
+        left = loadTexture("tex_cenario/wood_2.png");
+        top = loadTexture("tex_cenario/wood_3.png");
+        bottom = loadTexture("tex_cenario/wood_4.png");
+        break;
+    default: // any other value inserts debug texture (bloco de fita cassete do jogo original)
+        back = loadTexture("tex_cenario/casset_block_1.png");
+        front = loadTexture("tex_cenario/casset_block_1.png");
+        right = loadTexture("tex_cenario/casset_block_1.png");
+        left = loadTexture("tex_cenario/casset_block_1.png");
+        top = loadTexture("tex_cenario/casset_block_1.png");
+        bottom = loadTexture("tex_cenario/casset_block_1.png");
+        break;
+    }
+
+    platform->platformTextures.texBack = back;
+    platform->platformTextures.texFront = front;
+    platform->platformTextures.texRight = right;
+    platform->platformTextures.texLeft = left;
+    platform->platformTextures.texTop = top;
+    platform->platformTextures.texBase = bottom;
 }
