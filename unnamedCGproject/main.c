@@ -222,11 +222,11 @@ void display() {
     GLfloat specularLight[] = {0.6f, 0.6f, 1.0f, 1.0f};  // brilho frio, quase metálico
     GLfloat lightPosition[] = {0.0f, 400.0f, 200.0f, 1.0f}; // vindo de cima, tipo lua
 
-    // Define as propriedades do material
-    GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
-    GLfloat diffuseMaterial[]  = {0.8f, 0.8f, 0.8f, 1.0f};
-    GLfloat specularMaterial[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    GLfloat shininess = 20;
+
+    // Define as propriedades do player
+    float ambientDiffusePlayer[] = {0.8f, 0.8f, 0.8f, 0.5f};
+    float specularPlayer[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    float shininessPlayer = 20.0f;
 
     // chama a funcao para aplicar iluminacao
     setupLighting(ambientLight, diffuseLight, specularLight, lightPosition);
@@ -234,26 +234,24 @@ void display() {
     glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
 
     // chama função para desenhar o modelo 3D na tela a cada frame
-    setMaterial(ambientMaterial, diffuseMaterial, specularMaterial, shininess);
+    setMaterial(ambientDiffusePlayer, specularPlayer, shininessPlayer);
     drawPlayerModel(&player, playerRotation);
 
     for (int i = 0; i < objectCount; ++i) {
         if (sceneObjects[i].type == PLATFORM) {
-            GLfloat ambPlatformMaterial[] = {0.3f, 0.3f, 0.3f, 1.0f};
-            GLfloat diffPlatformMaterial[] = {0.6f, 0.6f, 0.6f, 1.0f};
-            GLfloat specPlatformMaterial[] = {0.1f, 0.1f, 0.1f, 1.0f};
-            shininess = 10;
+            float ambientDiffusePlatform[] = {0.6f, 0.6f, 0.6f, 0.3f};
+            float specularPlatform[] = {0.1f, 0.1f, 0.1f, 1.0f};
+            float shininessPlatform = 10.0f;
 
-            setMaterial(ambPlatformMaterial, diffPlatformMaterial, specPlatformMaterial, shininess);
+            setMaterial(ambientDiffusePlatform, specularPlatform, shininessPlatform);
             drawPlatform(&sceneObjects[i]);
         }
         else {
-            GLfloat ambObjectMaterial[] = {0.2f, 0.2f, 0.25f, 1.0f};
-            GLfloat diffObjectMaterial[] = {0.5f, 0.5f, 0.65f, 1.0f};
-            GLfloat specObjectMaterial[] = {0.4f, 0.4f, 0.4f, 1.0f};
-            shininess = 30.0f;
+            float ambientDiffuseObject[] = {0.5f, 0.5f, 0.65f, 0.2f};
+            float specularObject[] = {0.4f, 0.4f, 0.4f, 1.0f};
+            float shininessObject = 30.0f;
 
-            setMaterial(ambObjectMaterial, diffObjectMaterial, specObjectMaterial, shininess);
+            setMaterial(ambientDiffuseObject, specularObject, shininessObject);
             drawObject(&sceneObjects[i]);
         }
         //drawCollisionBoxWireframe(sceneObjects[i].collision);
