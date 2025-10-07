@@ -15,10 +15,11 @@
 #define DEATH_Y_LEVEL -15.0f // Define a altura em que o jogador volta para o ponto inicial
 #define MAX_OBJECTS 50 // Define o máximo de objetos na cena
 
-int verticalMovement;
-int horizontalMovement;
 float fieldOfView = 60.0f;
 int lastMousex, lastMousey;
+// Estado do jogo
+bool gameCompleted = false;
+float completionX, completionY, completionZ;
 
 // ângulo horizontal
 float thetaAngle = 0.0f;
@@ -33,17 +34,14 @@ float playerRotation = 0.0f;
 bool isCameraActive = false;
 int winWidth = 1000, winHeight = 750;
 
-Player player = {
-    0.0f, 0.0f, 0.0f,     // x, y, z
-    false,                 // isOnGround
-    true,                  // canJump
-    false,                 // isRespawning
-    false,                 // isJumping
-    IDLE,                  // state
-    {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // collision
-    NULL                   // modelData
-};
+Player player = {0.0f, 0.0f, 0.0f, // x, y, z
+                 false, // isOnGround
+                 IDLE, // state
+                 {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, // collisionBox
+                 NULL, // modelData
+                 0}; // groundObjectIndex
 
+//                           W      A      S      D     JUMP
 PlayerMoveKeys moveKeys = {false, false, false, false, false};
 
 float checkpointX, checkpointY, checkpointZ;
@@ -54,7 +52,6 @@ SceneObject sceneObjects[MAX_OBJECTS];
 int objectCount = 0;
 
 // índice de início das plataformas no array sceneObjects
-int platformStartIndex = 0; //  por enquanto não vai usar isso, talvez depois
 SceneObject objectsInCollisionRange[MAX_OBJECTS];
 int objInColRangeCount = 0;
 
@@ -71,7 +68,7 @@ int init() {
     glCullFace(GL_BACK);
 
     glEnable(GL_TEXTURE_2D);
-    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);//forçar a textura a substituir a cor/material
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);//forçar a textura a substituir a cor/material
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -80,15 +77,13 @@ int init() {
 
     loadSkybox();
 
-
-    //1. Define a posi��o inicial do jogador (� esquerda)
-    //player.x = 0.0f;
-    //player.y = 2.0f;
-    //player.z = 0.0f;
-
     checkpointX = player.x;
     checkpointY = 2.0f;
     checkpointZ = player.z;
+
+    completionX = -10.0f;  // x da última plataforma
+    completionY = 50.0f;   // y da última plataforma
+    completionZ = 360.0f; // z da ultima plataforma
 
     // daqui pra baixo tem que substituir pelo load com arquivo
     //loadPlayerModel(&player, "3dfiles/player.glb");
@@ -97,12 +92,6 @@ int init() {
 
     // adiciona ESPINHOS
     for (int i = 0; i < 15; i++) {
-        // Garante que não vamos ultrapassar o limite de objetos
-        // desnecessário agora que não carrega mais
-        // if (objectCount >= MAX_OBJECTS) break;
-        // Carrega um espinho na posição correta
-        // agora está no fileManager
-        // loadObject(&sceneObjects[objectCount+numPlatforms], "3dfiles/spike.glb", spikePositions[i][0], spikeBaseLevelY, spikePositions[i][1]);
 
         // Gira o espinho para ficar na vertical
         sceneObjects[objectCount-i].rotationAngle = -90.0f;
@@ -119,27 +108,9 @@ int init() {
             currentSpike->anim.minLimit = currentSpike->y; // Ponto mais baixo
             currentSpike->anim.maxLimit = currentSpike->y + 7.0f; // Ponto mais alto
         }
-        //objectCount++; // Incrementa o contador de objetos
     }
 
-    // agora adiciona plataformas
-    //loadLevelPlatforms();
-
-    // Índice da plataforma 9 é (0-indexed, então é 8)
-    int ninePlatformIndex = platformStartIndex + 8;
-    // Garante que não vamos acessar um índice fora do array
-    if (ninePlatformIndex < objectCount) {
-        // Ativa a animação
-        sceneObjects[ninePlatformIndex].anim.isAnimated = true;
-        // Define os parâmetros da animação
-        sceneObjects[ninePlatformIndex].anim.animationAxis = 0; // 0 para Eixo X, 1 para Eixo Z
-        sceneObjects[ninePlatformIndex].anim.moveSpeed = 8.0f;     // Velocidade do movimento
-        sceneObjects[ninePlatformIndex].anim.moveDirection = 1.0f; // Começa se movendo na direção positiva
-
-        // A plataforma começará em x=0.0 e se moverá entre -20.0 e 20.0
-        sceneObjects[ninePlatformIndex].anim.minLimit = -20.0f;
-    }
-
+    // ADICIONA ANIMAÇÕES
     for (int i = 0; i < objectCount; i++) {
         SceneObject* currentObject = &sceneObjects[i];
 
@@ -214,10 +185,6 @@ int init() {
     return 1;
 }
 
-void drawPlayerShadowFunc(void) {
-    drawPlayerModel(&player, playerRotation);
-}
-
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -232,39 +199,61 @@ void display() {
               player.x, player.y + 4, player.z,
               0.0, 1.0, 0.0);
 
+    glEnable(GL_LIGHTING); // Habilita o sistema de iluminação
+    glEnable(GL_LIGHT0); // Ativa a luz 0
 
     glPushMatrix();
-    // skybox na posição da câmera (sem se mover com o jogador)
-    glTranslatef(player.x, player.y, player.z);
-    drawSkybox(50.0f);
+        // Salva os atributos de enable e do buffer de profundidade
+        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_LIGHTING); // Skybox não precisa de luz
+        glDisable(GL_CULL_FACE); // Garante que o interior da caixa seja desenhado
+        glDepthMask(GL_FALSE);   // Impede que a skybox escreva no buffer de profundidade
+
+        // Translada a skybox para a posição da câmera para criar a ilusão de um fundo infinito
+        glTranslatef(camX, camY, camZ);
+        drawSkybox(500.0f);
+
+        glPopAttrib(); // Restaura os atributos (inclusive reativa o glDepthMask)
     glPopMatrix();
 
-
     // Definindo as propriedades da fonte de luz
-    GLfloat ambientLight[]  = {0.2f, 0.2f, 0.2f, 1.0f};  // Luz ambiente fraca
-    GLfloat diffuseLight[]  = {0.8f, 0.8f, 0.8f, 1.0f};  // Luz difusa branca
-    GLfloat specularLight[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Brilho especular branco
-    GLfloat lightPosition[] = {200.0f, 500.0f, 200.0f, 1.0f}; // Posi��o da luz
+    GLfloat ambientLight[]  = {0.1f, 0.1f, 0.2f, 1.0f};  // ambiente azulado fraco
+    GLfloat diffuseLight[]  = {0.4f, 0.4f, 0.8f, 1.0f};  // luz difusa azul-claro
+    GLfloat specularLight[] = {0.6f, 0.6f, 1.0f, 1.0f};  // brilho frio, quase metálico
+    GLfloat lightPosition[] = {0.0f, 400.0f, 200.0f, 1.0f}; // vindo de cima, tipo lua
 
-    // Define as propriedades do material (pode ser gen�rico para todos os objetos)
+    // Define as propriedades do material
     GLfloat ambientMaterial[]  = {0.5f, 0.5f, 0.5f, 1.0f};
     GLfloat diffuseMaterial[]  = {0.8f, 0.8f, 0.8f, 1.0f};
     GLfloat specularMaterial[] = {0.2f, 0.2f, 0.2f, 1.0f};
     GLfloat shininess = 20;
 
-    // chama a fun��o para aplicar ilumina��o
-    setupLighting(ambientLight, diffuseLight, specularLight, lightPosition, ambientMaterial, diffuseMaterial, specularMaterial, shininess);
+    // chama a funcao para aplicar iluminacao
+    setupLighting(ambientLight, diffuseLight, specularLight, lightPosition);
 
     glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
 
-    // chama fun��o para desenhar o modelo 3D na tela a cada frane
+    // chama função para desenhar o modelo 3D na tela a cada frame
+    setMaterial(ambientMaterial, diffuseMaterial, specularMaterial, shininess);
     drawPlayerModel(&player, playerRotation);
 
     for (int i = 0; i < objectCount; ++i) {
         if (sceneObjects[i].type == PLATFORM) {
+            GLfloat ambPlatformMaterial[] = {0.3f, 0.3f, 0.3f, 1.0f};
+            GLfloat diffPlatformMaterial[] = {0.6f, 0.6f, 0.6f, 1.0f};
+            GLfloat specPlatformMaterial[] = {0.1f, 0.1f, 0.1f, 1.0f};
+            shininess = 10;
+
+            setMaterial(ambPlatformMaterial, diffPlatformMaterial, specPlatformMaterial, shininess);
             drawPlatform(&sceneObjects[i]);
         }
         else {
+            GLfloat ambObjectMaterial[] = {0.2f, 0.2f, 0.25f, 1.0f};
+            GLfloat diffObjectMaterial[] = {0.5f, 0.5f, 0.65f, 1.0f};
+            GLfloat specObjectMaterial[] = {0.4f, 0.4f, 0.4f, 1.0f};
+            shininess = 30.0f;
+
+            setMaterial(ambObjectMaterial, diffObjectMaterial, specObjectMaterial, shininess);
             drawObject(&sceneObjects[i]);
         }
         //drawCollisionBoxWireframe(sceneObjects[i].collision);
@@ -273,11 +262,79 @@ void display() {
 
     drawShadow(&player, objectsInCollisionRange, playerRotation);
 
-    glutPostRedisplay();
+    if (gameCompleted) {
+        // Salva o estado atual das matrizes
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+
+        // Configura projeção ortográfica 2D
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluOrtho2D(0, winWidth, 0, winHeight);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        // Desativa recursos que interferem no texto 2D
+        glDisable(GL_LIGHTING);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_TEXTURE_2D);
+
+        // Cor dourada
+        glColor3f(1.0f, 0.8f, 0.0f);
+
+        // Mensagem principal - fonte ainda maior
+        const char* message1 = "GG! Voce passou em CG!";
+        float textWidth1 = 0;
+        for (int i = 0; message1[i] != '\0'; i++) {
+            textWidth1 += glutBitmapWidth(GLUT_BITMAP_9_BY_15, message1[i]);
+        }
+        float x1 = (winWidth - textWidth1) / 2;
+        float y1 = winHeight * 0.8f; // 60% da altura da tela (mais para cima)
+
+        glRasterPos2f(x1, y1);
+        for (int i = 0; message1[i] != '\0'; i++) {
+            glutBitmapCharacter(GLUT_BITMAP_9_BY_15, message1[i]);
+        }
+
+        // Mensagem secundária - fonte maior também
+        const char* message2 = "Pressione ESC para sair";
+        float textWidth2 = 0;
+        for (int i = 0; message2[i] != '\0'; i++) {
+            textWidth2 += glutBitmapWidth(GLUT_BITMAP_8_BY_13, message2[i]);
+        }
+        float x2 = (winWidth - textWidth2) / 2;
+        float y2 = winHeight * 0.75f; // 40% da altura da tela
+
+        glRasterPos2f(x2, y2);
+        for (int i = 0; message2[i] != '\0'; i++) {
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, message2[i]);
+        }
+
+        // Restaura estado original
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_TEXTURE_2D);
+
+        // Restaura as matrizes
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+    }
     glutSwapBuffers();
 }
 
 void handleKeyboardInput(unsigned char pressedKey, int x, int y) {
+    if (gameCompleted && pressedKey == 27) {
+        printf("Jogo concluído! Saindo...\n");
+        exit(0);
+    }
+
     if (pressedKey == 27) {
         isCameraActive = !isCameraActive;
         if (isCameraActive) {
@@ -323,26 +380,43 @@ void simulatePhysics(float deltaTime) {
 
     // 5. Detecta objetos próximos para otimizar a colisão
     getObjectsInCollisionRange(player, sceneObjects, MAX_OBJECTS, objectsInCollisionRange, &objInColRangeCount);
+    updatePlayerCollisionBox(&player);
 
     // 6. Verifica colisões com objetos perigosos ANTES do movimento
     for (int i = 0; i < objInColRangeCount; i++) {
-        if (objectsInCollisionRange[i].type == DANGER &&
-            isObjectColliding(player.collision, objectsInCollisionRange[i].collision)) {
+        if (objectsInCollisionRange[i].type == DANGER && isObjectColliding(player.collision, objectsInCollisionRange[i].collision)) {
             printf("Colidiu com um objeto perigoso! Morreu!\n");
             respawnPlayer();
             return; // Sai da física neste frame
         }
 
-        else if (objectsInCollisionRange[i].type == FLAG) {
-                checkpointX = objectsInCollisionRange[i].x + 2.0f;
+        else if (objectsInCollisionRange[i].type == FLAG && !objectsInCollisionRange[i].checkpointActivated) {
+            if (isObjectColliding(player.collision, objectsInCollisionRange[i].collision)) {
+                checkpointX = objectsInCollisionRange[i].x - 2.0f;
                 checkpointY = objectsInCollisionRange[i].y + 1.0f;
-                checkpointZ = objectsInCollisionRange[i].z + 2.0f;
+                checkpointZ = objectsInCollisionRange[i].z - 2.0f;
                 printf("Checkpoint atualizado em (%.1f, %.1f, %.1f)\n", checkpointX, checkpointY, checkpointZ);
-                // Opcional: Desativa a bandeira para não ser pega novamente
+
+                // Marca o objeto original como ativado
+                for (int j = 0; j < objectCount; j++) {
+                    if (sceneObjects[j].x == objectsInCollisionRange[i].x &&
+                        sceneObjects[j].y == objectsInCollisionRange[i].y &&
+                        sceneObjects[j].z == objectsInCollisionRange[i].z &&
+                        sceneObjects[j].type == FLAG) {
+                        sceneObjects[j].checkpointActivated = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        else if (objectsInCollisionRange[i].type == WIN) {
+            if (isObjectColliding(player.collision, objectsInCollisionRange[i].collision)) {
+                gameCompleted = true;
                 objectsInCollisionRange[i].type = DEFAULT;
             }
+        }
     }
-
     // 7. Processa movimento e colisões com plataformas/paredes
     collideAndSlide(playerVelocity, &player, objectsInCollisionRange, objInColRangeCount, deltaTime);
     getPlayerMovingAngle(playerVelocity, &playerRotation);
@@ -456,10 +530,47 @@ void respawnPlayer() {
     updatePlayerCollisionBox(&player);
 
     // 4. Define flags de estado corretas
-    player.isRespawning = false;
     player.isOnGround = false;  // Força a física a detectar o chão novamente
-    player.isJumping = true;
 }
+
+
+// Desenha o texto de que ganhemo o jogo
+void drawText(float x, float y, const char *text, void (*font)) {
+    // Salva estado
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+
+    // Configura 2D
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, winWidth, 0, winHeight);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+    glColor3f(1.0f, 0.8f, 0.0f); // Dourado
+
+    glRasterPos2f(x, y);
+    for (int i = 0; text[i] != '\0'; i++) {
+        glutBitmapCharacter(font, text[i]);
+    }
+
+    // Restaura estado
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+}
+
+
+
 
 int main(int argc, char** argv)
 {

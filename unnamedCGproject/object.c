@@ -50,6 +50,21 @@ void drawObject(SceneObject* object) {
     if (!object->data) {
         return;
     }
+    // Salva o estado atual da textura
+    bool wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
+
+    // Verifica se é o troféu (WIN)
+    bool isTrophy = (object->type == WIN);
+
+    // Se for o troféu, desabilita textura e define cor
+    if (isTrophy) {
+        glColor3f(1.0f, 0.8f, 0.0f); // Dourado
+    } else {
+        // Para outros objetos, habilita textura e vincula
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, object->textureID);
+    }
+    
     glBindTexture(GL_TEXTURE_2D, object->textureID);
     glPushMatrix();
         glTranslatef(object->x, object->y, object->z);
@@ -160,19 +175,6 @@ void getCollisionBoxFromObject(SceneObject *object) {
             object->collision.maxY = object->y + 3.0f;
         }
 
-        // Cria uma caixa de colisão personalizada para a bandeira, ignorando a do ficheiro.
-        if (object->type == FLAG) {
-            float halfWidth = 0.2f; // Largura total de 2
-            float height = 5.0f;    // Altura total de 5
-            float halfDepth = 0.2f; // Profundidade total de 2
-
-            object->collision.minX = object->x - halfWidth;
-            object->collision.maxX = object->x + halfWidth;
-            object->collision.minY = object->y; // A base da caixa fica na posição Y da bandeira
-            object->collision.maxY = object->y + height;
-            object->collision.minZ = object->z - halfDepth;
-            object->collision.maxZ = object->z + halfDepth;
-        }
     }
 }
 
