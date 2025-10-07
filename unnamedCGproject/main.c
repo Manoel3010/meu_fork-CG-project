@@ -222,7 +222,7 @@ void display() {
     GLfloat specularLight[] = {0.6f, 0.6f, 1.0f, 1.0f};  // brilho frio, quase metálico
     GLfloat lightPosition[] = {0.0f, 400.0f, 200.0f, 1.0f}; // vindo de cima, tipo lua
 
-
+    
     // Define as propriedades do player
     float ambientDiffusePlayer[] = {0.8f, 0.8f, 0.8f, 0.5f};
     float specularPlayer[] = {0.2f, 0.2f, 0.2f, 1.0f};
@@ -237,6 +237,7 @@ void display() {
     setMaterial(ambientDiffusePlayer, specularPlayer, shininessPlayer);
     drawPlayerModel(&player, playerRotation);
 
+
     for (int i = 0; i < objectCount; ++i) {
         if (sceneObjects[i].type == PLATFORM) {
             float ambientDiffusePlatform[] = {0.6f, 0.6f, 0.6f, 0.3f};
@@ -247,7 +248,7 @@ void display() {
             drawPlatform(&sceneObjects[i]);
         }
         else {
-            float ambientDiffuseObject[] = {0.5f, 0.5f, 0.65f, 0.2f};
+            float ambientDiffuseObject[] = {0.5f, 0.5f, 0.65f, 0.2f}; // normalmente usa o diffuse neste parâmetro
             float specularObject[] = {0.4f, 0.4f, 0.4f, 1.0f};
             float shininessObject = 30.0f;
 
@@ -589,3 +590,4 @@ int main(int argc, char** argv)
     glutMainLoop();
     return 0;
 }
+      
