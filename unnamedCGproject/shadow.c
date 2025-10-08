@@ -41,7 +41,7 @@ void makeShadowMatrix(GLfloat plane[4], GLfloat lightPos[4], GLfloat shadowMat[1
 // Desenha a sombra de um objeto em relação a um plano
 // Entrada: plano, luz e função de desenho do objeto
 // ------------------------------------------------------------
-void drawShadow(Player *player, SceneObject *objectsInCollisionRange, float playerRotation) {
+void drawShadow(Player *player, SceneObject *objectsInCollisionRange, float *playerRotation) {
     if (player->isOnGround && player->groundObjectIndex >= 0) {
         SceneObject *groundObj = &objectsInCollisionRange[player->groundObjectIndex];
 
@@ -50,7 +50,7 @@ void drawShadow(Player *player, SceneObject *objectsInCollisionRange, float play
         GLfloat shadowMat[16];
         GLfloat lightPos[] = {200.0f, 500.0f, 200.0f, 1.0f};
 
-        // Cria a matriz de sombra 
+        // Cria a matriz de sombra (usa a função do shadow.c)
         makeShadowMatrix(plane, lightPos, shadowMat);
 
         // Desenha a sombra diretamente
@@ -66,10 +66,8 @@ void drawShadow(Player *player, SceneObject *objectsInCollisionRange, float play
 
         // Desenha o modelo do player projetado
         glTranslatef(player->x, player->y, player->z);
-        glRotatef(playerRotation, 0.0f, 1.0f, 0.0f);
+        glRotatef((*playerRotation), 0.0f, 1.0f, 0.0f);
         glScalef(1.0f, 1.0f, 1.0f);
-
-        
 
         // Usa o mesmo desenho do modelo do player
         if (player->modelData) {

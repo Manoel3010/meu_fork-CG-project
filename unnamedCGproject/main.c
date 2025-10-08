@@ -19,7 +19,6 @@ float fieldOfView = 60.0f;
 int lastMousex, lastMousey;
 // Estado do jogo
 bool gameCompleted = false;
-float completionX, completionY, completionZ;
 
 // ângulo horizontal
 float thetaAngle = 0.0f;
@@ -80,13 +79,6 @@ int init() {
     checkpointX = player.x;
     checkpointY = 2.0f;
     checkpointZ = player.z;
-
-    completionX = -10.0f;  // x da última plataforma
-    completionY = 50.0f;   // y da última plataforma
-    completionZ = 360.0f; // z da ultima plataforma
-
-    // daqui pra baixo tem que substituir pelo load com arquivo
-    //loadPlayerModel(&player, "3dfiles/player.glb");
 
     loadObjectsFromFile("scenario.txt", sceneObjects, &player, &objectCount, MAX_OBJECTS);
 
@@ -194,7 +186,7 @@ void display() {
     float camY = player.y + camRadius * sinf(phiAngle);
     float camZ = player.z + camRadius * cosf(phiAngle) * sinf(thetaAngle);
 
-    // Define a orienta��o da c�mera
+    // Define a orientacao da camera
     gluLookAt(camX, camY, camZ,
               player.x, player.y + 4, player.z,
               0.0, 1.0, 0.0);
@@ -207,40 +199,44 @@ void display() {
         glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT);
         glDisable(GL_LIGHTING); // Skybox não precisa de luz
         glDisable(GL_CULL_FACE); // Garante que o interior da caixa seja desenhado
-        glDepthMask(GL_FALSE);   // Impede que a skybox escreva no buffer de profundidade
+        glDepthMask(GL_FALSE); // Desliga a profundidade
 
         // Translada a skybox para a posição da câmera para criar a ilusão de um fundo infinito
         glTranslatef(camX, camY, camZ);
         drawSkybox(500.0f);
 
-        glPopAttrib(); // Restaura os atributos (inclusive reativa o glDepthMask)
+        glPopAttrib(); // Restaura os atributos
     glPopMatrix();
 
     // Definindo as propriedades da fonte de luz
-    GLfloat ambientLight[]  = {0.1f, 0.1f, 0.2f, 1.0f};  // ambiente azulado fraco
-    GLfloat diffuseLight[]  = {0.4f, 0.4f, 0.8f, 1.0f};  // luz difusa azul-claro
-    GLfloat specularLight[] = {0.6f, 0.6f, 1.0f, 1.0f};  // brilho frio, quase metálico
+    GLfloat ambientLight[] = {0.1f, 0.1f, 0.2f, 1.0f}; // ambiente azulado fraco
+    GLfloat diffuseLight[] = {0.4f, 0.4f, 0.8f, 1.0f}; // luz difusa azul-claro
+    GLfloat specularLight[] = {0.6f, 0.6f, 1.0f, 1.0f}; // brilho frio
     GLfloat lightPosition[] = {0.0f, 400.0f, 200.0f, 1.0f}; // vindo de cima, tipo lua
 
-    
-    // Define as propriedades do player
-    float ambientDiffusePlayer[] = {0.8f, 0.8f, 0.8f, 0.5f};
-    float specularPlayer[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    float shininessPlayer = 20.0f;
+    // DEBUG - CHECAR POSIÇÃO DA LUZ
+    //glPushMatrix();
+    //glTranslatef(0.0f, 300.0f, 200.0f);
+    //glutSolidSphere(10, 5, 5);
+    //glPopMatrix();
 
     // chama a funcao para aplicar iluminacao
     setupLighting(ambientLight, diffuseLight, specularLight, lightPosition);
 
     glBindTexture(GL_TEXTURE_2D, 0); // desliga a textura atual
 
+    // Define as propriedades do material do player
+    float ambientDiffusePlayer[] = {0.6f, 0.6f, 0.6f, 1.0f};
+    float specularPlayer[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    float shininessPlayer = 20.0f;
+
     // chama função para desenhar o modelo 3D na tela a cada frame
     setMaterial(ambientDiffusePlayer, specularPlayer, shininessPlayer);
     drawPlayerModel(&player, playerRotation);
 
-
     for (int i = 0; i < objectCount; ++i) {
         if (sceneObjects[i].type == PLATFORM) {
-            float ambientDiffusePlatform[] = {0.6f, 0.6f, 0.6f, 0.3f};
+            float ambientDiffusePlatform[] = {0.4f, 0.4f, 0.4f, 1.0f};
             float specularPlatform[] = {0.1f, 0.1f, 0.1f, 1.0f};
             float shininessPlatform = 10.0f;
 
@@ -248,7 +244,7 @@ void display() {
             drawPlatform(&sceneObjects[i]);
         }
         else {
-            float ambientDiffuseObject[] = {0.5f, 0.5f, 0.65f, 0.2f}; // normalmente usa o diffuse neste parâmetro
+            float ambientDiffuseObject[] = {0.3f, 0.3f, 0.65f, 0.2f}; // normalmente usa o diffuse neste parâmetro
             float specularObject[] = {0.4f, 0.4f, 0.4f, 1.0f};
             float shininessObject = 30.0f;
 
@@ -259,7 +255,7 @@ void display() {
     }
     //drawCollisionBoxWireframe(player.collision);
 
-    drawShadow(&player, objectsInCollisionRange, playerRotation);
+    drawShadow(&player, objectsInCollisionRange, &playerRotation);
 
     if (gameCompleted) {
         // Salva o estado atual das matrizes
@@ -590,4 +586,3 @@ int main(int argc, char** argv)
     glutMainLoop();
     return 0;
 }
-      
